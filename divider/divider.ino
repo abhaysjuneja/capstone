@@ -8,22 +8,26 @@ Author: Abhayjeet Singh Juneja
 Date: March 13th 2017
 ***/
 
+#include<SoftwareSerial.h>
+
+SoftwareSerial esp (3,4); //RX,TX
+
 //status macros
 #define LEFT -1
 #define CENTER 0
 #define RIGHT 1
 
 //pin variables for front motor
-const int mf_a=8;
-const int mf_b=9;
-const int mf_c=10;
-const int mf_d=11;
+const int mf_a=9;
+const int mf_b=10;
+const int mf_c=11;
+const int mf_d=12;
 
 //pin variables for back motor
-const int mb_a=4;
-const int mb_b=5;
-const int mb_c=6;
-const int mb_d=7;
+const int mb_a=5;
+const int mb_b=6;
+const int mb_c=7;
+const int mb_d=8;
 
 //delay between motor phases - using 4 phase stepper motor
 int del_ay = 4;
@@ -33,6 +37,8 @@ int newStatus = CENTER;
 int currentStatus = CENTER;
 
 //function prototypes
+int initWifi();
+void getResponse();
 void motorLeftRotation();
 void motorRightRotation();
 void moveDividerLeftOneLane();
@@ -54,12 +60,58 @@ void setup(){
   pinMode(mb_b,OUTPUT);
   pinMode(mb_c,OUTPUT);
   pinMode(mb_d,OUTPUT);
+
+  if(!initWifi()){
+    Serial.println("Error at ESP initialization!")
+  }
 }
 
 void loop(){
+  talkToAPI();
   if(statusChange()){
     updateDivider();
   }
+}
+
+void ATResponse(){
+  while(!(esp.available()>0));
+  while(esp.available()>0){
+    Serial.write(esp.read());
+  }
+}
+
+void getResponse(){
+  while(!(esp.available()>0));
+  char st[7];
+  int len=0;
+  while(esp.available()>0){
+    st[len++]=esp.read();
+  }
+  newStatus=st;
+}
+
+
+int initWifi(){
+  esp.println("AT");
+  ATResponse();
+  delay(100);
+
+  esp.println("AT+CWJAP=\"don\'t even\", \"Password\"");
+  ATResponse();
+  delay(100);
+}
+
+void talkToAPI(){
+  esp.println("AT+CIPSTART=\"TCP\", \"https://traffic-capstone.run.aws-usw02-pr.ice.predix.io\", \"80\"");
+  ATResponse();
+  delay(100);
+
+  esp.println("AT+CIPSEND=20");
+  ATResponse();
+  delay(100);
+
+  esp.println("GET /dividerStatus")
+  getResponse();
 }
 
 void motorLeftRotation(){
@@ -68,7 +120,7 @@ void motorLeftRotation(){
   digitalWrite(mf_a,HIGH);
   digitalWrite(mb_a,HIGH);
   delay(del_ay);
-  
+
   //Phase A Low, Phase B High
   digitalWrite(mf_a,LOW);
   digitalWrite(mb_a,LOW);
@@ -101,7 +153,7 @@ void motorRightRotation(){
   digitalWrite(mf_d,HIGH);
   digitalWrite(mb_d,HIGH);
   delay(del_ay);
-  
+
   //Phase D Low, Phase C High
   digitalWrite(mf_d,LOW);
   digitalWrite(mb_d,LOW);
@@ -146,7 +198,7 @@ void moveDividerRightOneLane(){
 }
 
 void updateDivider(){
-  
+
   if(currentStatus==CENTER){
     if(newStatus==LEFT){
       moveDividerLeftOneLane();
